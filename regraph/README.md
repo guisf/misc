@@ -42,7 +42,7 @@ Install
 
 From the source directory, as root, you need to run:
 
-!# python setup.py install
+  python setup.py install
 
 
 Dependencies
