@@ -1,0 +1,182 @@
+#!/usr/bin/env python
+
+"""Generate graphs from standard input.
+
+The ordered pairs to be ploted are extracted from standard input according
+to a regular expression (-r option).
+
+The axis labels can be defined on the first line of text, following the
+same pattern as the regular expression.
+
+By default the graph file will be saved in user home or desktop 
+directory (-d option).
+
+The program can plot (float, float) or (timestamp, float) pairs.
+
+"""
+
+__usage__ = '%prog [options] < sample'
+__author__ = 'Guilherme Starvaggi Franca <guifranca@gmail.com>'
+__version__ = '1.0'
+__date__ = '2010-12-03'
+
+import re
+import sys
+import time
+import os
+import string
+import datetime
+import dateutil
+import optparse
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+def label(name):
+    """Beautify name of the columns to be used as labels in the graph."""
+    return re.sub(r'\s+', ' ', name.lower().strip().replace('_', ' '))
+
+def filename(xlabel, ylabel, ext='png'):
+    """Set file name based on labels and current time."""
+    now = datetime.datetime(*time.localtime()[:6])
+    xlabel = xlabel.replace(' ', '_')
+    ylabel = ylabel.replace(' ', '_')
+    return '%s-%s-%s.%s' % (xlabel, ylabel, now.strftime('%Y%m%d%H%M%S'), ext)
+
+def get_data(text, regex, verbose=False):
+    """Get data from the text.
+
+    It is assumed that each line contains the values of both columns, that
+    will be extracted based on the compiled 'regex' variable.
+
+    Returns the 'xtype', that is the string with value 'number' or 
+    'timestamp', x axis label, y axis label and a sorted list of tuples 
+    containing each ordered pair to be ploted: 
+        
+        > xtype, xlabel, ylabel, data
+
+    This function can be verbose, printing things to stdout.
+
+    """
+    xtype = ''
+    data = []
+    xlabel = 'x'
+    ylabel = 'y'
+    for i, line in enumerate(text):
+        i += 1
+        fields = regex.match(line)
+        if not fields:
+            if verbose:
+                print "line %i: doesn't match regex ... ignoring" % i
+            continue
+        x, y = fields.groups()
+        if not xtype:
+            try:
+                x = float(x)
+                xtype = 'number'
+            except:
+                try:
+                    x = mpl.dates.date2num(dateutil.parser.parse(x))
+                    xtype = 'timestamp'
+                except:
+                    if i == 1:
+                        xlabel, ylabel = label(x), label(y)
+                        if verbose:
+                            print "line %i: define axis labels ... ok" % i
+                    else:
+                        if verbose:
+                            print "line %i: not number nor timestamp ... "\
+                                  "ignoring" % i
+                    continue
+        else:
+            try:
+                if xtype == 'number':
+                    x = float(x)
+                elif xtype == 'timestamp':
+                    x = mpl.dates.date2num(dateutil.parser.parse(x))
+            except:
+                if verbose:
+                    print "line %i: not a %s ... ignoring" % (i, xtype)
+                continue
+        y = float(y)
+        data.append((x, y))
+        if verbose:
+            print "line %i: extracted (%s, %s) ... ok" % (i, str(x), y)
+    return xtype, xlabel, ylabel, sorted(data, key=lambda i: i[0])
+
+def plot_date(x, y, ylabel, output, width=640, height=480):
+    """Plot datetime versus float values."""
+    fmt = '%Y-%m-%d %H:%M:%S'
+    fig = plt.figure(figsize=(width/100.0, height/100.0), dpi=100)
+    ax = fig.add_subplot(111)
+    ax.set_ylabel(ylabel)
+    ax.plot_date(x, y, 'bo-')
+    ax.xaxis.set_major_formatter(mpl.dates.DateFormatter(fmt))
+    for tick in ax.xaxis.get_major_ticks():
+        tick.label1.set_fontsize(6)
+    fig.autofmt_xdate()
+    fig.savefig(output)
+
+def plot_number(x, y, xlabel, ylabel, output, width=640, height=480):
+    """Plot float versus float values."""
+    fig = plt.figure(figsize=(width/100.0, height/100.0), dpi=100)
+    ax = fig.add_subplot(111)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel)
+    ax.plot(x, y, 'bo-')
+    fig.savefig(output)
+
+### default variables #########################################################
+
+getfields = r'\s*(.+)\s*\|\s*(.+)\s*'
+user_home = os.path.expanduser("~")
+default_dir = os.path.join(user_home, "Desktop")
+if not os.path.exists(default_dir):
+    default_dir = os.path.join(user_home, "desktop")
+    if not os.path.exists(default_dir):
+        default_dir = user_home
+xsize, ysize = 640, 480
+type = 'png'
+verbose = False
+
+###############################################################################
+
+if __name__ == '__main__':
+    p = optparse.OptionParser(usage=__usage__, 
+                              description=re.sub(r'\s+', ' ', __doc__))
+    p.add_option("-x", "--width", dest="width", default=xsize, type="int",
+                 help="width in pixels (default %i)"%xsize)
+    p.add_option("-y", "--height", dest="height", default=ysize, type="int",
+                 help="height in pixels (default %i)"%ysize)
+    p.add_option("-d", "--dir", dest="dir", default=default_dir,
+                 help="directory to save the file (default %s)"%default_dir)
+    p.add_option("-r", "--regex", dest="re", default=getfields,
+                 help="regex to extract fields (default %s)"%getfields)
+    p.add_option("-v", "--verbose", dest="verbose", default=verbose,
+                 action='store_true',
+                 help="make program verbose (default %s)"%verbose)
+    opts = 'png jpg pdf eps ps csv'.split()
+    p.add_option("-t", "--type", dest="type", default=type, choices=opts,
+                 help="output type (default %s), options: %s"%(type, opts))
+    opt, args = p.parse_args()
+    try:
+        fields_re = re.compile(r'%s' % opt.re)
+        if opt.verbose:
+            print "using regex: %s" % opt.re
+    except:
+        print "invalid regular expression ... aborting"
+        sys.exit(1)
+    text = sys.stdin.readlines()
+    xtype, xlabel, ylabel, data = get_data(text, fields_re, opt.verbose)
+    if not data:
+        print "no data from input"
+        sys.exit()
+    x, y = [d[0] for d in data], [d[1] for d in data]
+    output = os.path.join(opt.dir, filename(xlabel, ylabel, opt.type.lower()))
+    if xtype == 'number':
+        plot_number(x, y, xlabel, ylabel, output, opt.width, opt.height)
+    elif xtype == 'timestamp':
+        plot_date(x, y, ylabel, output, opt.width, opt.height)
+    if opt.verbose:
+        print "file saved: %s" % output
+
