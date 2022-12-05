@@ -1,7 +1,7 @@
 Smurf File Manager
 ==================
 
-This is a simple program intend to be runned on text mode only. Despite
+This is a simple command line program. Despite
 being a console program, we assume that it is running
 through a graphical environment. Of course the main functionalities will 
 work in text mode only, but the graphical programs used to open 
@@ -16,5 +16,4 @@ of this program.
 
 The configuration file is called "config.py", and you should change
 the parameters in the first lines according to your needs. Follow the
-comments there in.
-
+comments therein.
