@@ -1,5 +1,5 @@
 About
-=====
+-----
 
 Regraph is a python program used to genereate number or timestamp line
 graphs from standard input. The data is extracted based on a regular 
@@ -7,7 +7,7 @@ expression.
 
 
 How it works
-============
+------------
 
 The data is extracted based on a regular expression, that can be customized
 through the command line (-r option), or rely on its default value.
@@ -38,7 +38,7 @@ ps or csv.
 
 
 Install
-=======
+-------
 
 From the source directory, as root, you need to run:
 
@@ -46,17 +46,16 @@ From the source directory, as root, you need to run:
 
 
 Dependencies
-============
+------------
 
-- Python >= 2.5
+- Python 2.5
 - Matplotlib
 
 
 Author
-======
+------
 
 Guilherme Starvaggi Franca
 
-Feel free to send messages about bugs.
 
 
