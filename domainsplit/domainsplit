@@ -1,0 +1,218 @@
+#!/usr/bin/python
+
+"""Graphical program that takes a text file as input, then find all domains
+in this file and run a viterbi algorithm to discover what is the most probable
+sequence of words that composes the domain name.
+
+The results are written to an output file.
+
+The user wants that domains with hyphens, numbers and composed of more than
+3 words or only one word, must be discarded.
+
+author: Guilherme S. Franca <guifranca@gmail.com>
+date: 2010-10-09
+version: 0.1
+
+"""
+
+__author__ = 'Guilherme S. Franca <guifranca@gmail.com>'
+__version__ = '0.1'
+
+
+import re
+import time
+import sys
+import os
+from itertools import groupby
+from Tkinter import *
+import tkFileDialog
+
+def viterbi_segment(text):
+    """Return list of words and probability."""
+    probs, lasts = [1.0], [0]
+    for i in range(1, len(text) + 1):
+        prob_k, k = max((probs[j] * word_prob(text[j:i]), j)
+                        for j in range(max(0, i - max_word_length), i))
+        probs.append(prob_k)
+        lasts.append(k)
+    words = []
+    i = len(text)
+    while 0 < i:
+        words.append(text[lasts[i]:i])
+        i = lasts[i]
+    words.reverse()
+    return words, probs[-1]
+
+def word_prob(word): 
+    return dictionary.get(word, 0) / total
+
+def words(text): 
+    return re.findall('[a-z]{2,}', text.lower())
+
+#data_dir = os.path.join(sys.prefix, 'share', 'domainsplit', 'data')
+data_dir = '/home/gui/prog/domainsplit/data'
+
+dict_file = open(os.path.join(data_dir, 'big.txt'))
+dictionary = dict((w, len(list(ws)))
+                  for w, ws in groupby(sorted(words(dict_file.read()))))
+
+max_word_length = max(map(len, dictionary))
+total = float(sum(dictionary.values()))
+
+
+class App:
+    """Application with graphical interface.
+    
+    This is a very simple interface. The user must choose input and output
+    file, then the RUN button will be available to click, and the program
+    runs and write contents to output file.
+
+    """
+
+    def __init__(self, root):
+        self.root = root
+        self.root.title('Split Domains')
+
+        self.default_input = 'Choose text file with domains.'
+        self.default_output = 'Choose output file.'
+        
+        # input and output files
+        self.input = ''
+        self.output = ''
+        self.input_file_name = StringVar()
+        self.input_file_name.set(self.default_input)
+        self.output_file_name = StringVar()
+        self.output_file_name.set(self.default_output)
+        
+        # progress information
+        self.progress = StringVar()
+
+        # image and icons
+        self.input_icon = PhotoImage(file=os.path.join(data_dir, 'input.gif'))
+        self.output_icon = PhotoImage(file=os.path.join(data_dir,'output.gif'))
+        self.run_icon = PhotoImage(file=os.path.join(data_dir, 'run.gif'))
+        self.reset_icon = PhotoImage(file=os.path.join(data_dir, 'reset.gif'))
+        self.exit_icon = PhotoImage(file=os.path.join(data_dir, 'exit.gif'))
+
+        frame = Frame(self.root)
+        frame.grid(padx=20, pady=30, sticky=W)
+        
+        # input button and label
+        input = Button(frame, text='Input', image=self.input_icon, 
+                       compound=LEFT, command=self.input_file, padx=5)
+        input.grid(pady=5, sticky=W+E)
+        input_name = Label(frame, textvariable=self.input_file_name, anchor=W)
+        input_name.grid(row=0, column=1, padx=5, sticky=W)
+        
+        # output button and label
+        output = Button(frame, text='Output', image=self.output_icon, 
+                        compound=LEFT, command=self.output_file, padx=5)
+        output.grid(column=0, row=1, pady=5, sticky=W+E)
+        output_name = Label(frame, textvariable=self.output_file_name, anchor=W)
+        output_name.grid(row=1, column=1, padx=5, sticky=W)
+        
+        # buttons (run, reset, exit)
+        frame_buttons = Frame(self.root, bd=1, relief=SUNKEN)
+        frame_buttons.grid(row=1, column=0, padx=20, sticky=W+E, 
+                           ipady=10, ipadx=10)
+        
+        self.run_button = Button(frame_buttons, text='Run', padx=5,
+                                 image=self.run_icon, 
+                                 compound=LEFT, state=DISABLED, 
+                                 command=self.split_domains)
+        self.run_button.grid(row=0, column=0, padx=5)
+
+        clear_button = Button(frame_buttons, text='Reset', padx=5,
+                              image=self.reset_icon, 
+                              compound=LEFT, command=self.clear)
+        clear_button.grid(row=0, column=1, padx=5)
+
+        quit_button = Button(frame_buttons, text='Exit', image=self.exit_icon, 
+                             compound=LEFT, command=self.exit, padx=5)
+        quit_button.grid(row=0, column=2, padx=5)
+
+        # show progress when running
+        status = Frame(self.root)
+        status.grid(row=2, column=0, padx=20, pady=5, sticky=W)
+        self.prog = Label(status, textvariable=self.progress)
+        self.prog.grid(row=0, column=0, sticky=W)
+
+    def input_file(self):
+        """Only text files are allowed."""
+        self.progress.set('')
+        ftypes = [('text files', '.txt')]
+        self.input = tkFileDialog.askopenfilename(filetypes=ftypes)
+        if self.input:
+            self.input_file_name.set(self.input)
+            if self.output:
+                self.run_button.config(state=NORMAL)
+    
+    def output_file(self):
+        """Write contents to a CSV file only."""
+        self.progress.set('')
+        ftypes = [('csv files', '.csv')]
+        self.output = tkFileDialog.asksaveasfilename(filetypes=ftypes)
+        if self.output:
+            if not self.output.lower().endswith('.csv'):
+                self.output = '%s.csv' % self.output
+            self.output_file_name.set(self.output)
+            if self.input:
+                self.run_button.config(state=NORMAL)
+
+    def exit(self):
+        self.root.destroy()
+
+    def clear(self):
+        """Clear input data."""
+        self.input_file_name.set(self.default_input)
+        self.output_file_name.set(self.default_output)
+        self.input = ''
+        self.output = ''
+        self.run_button.config(state=DISABLED)
+        self.progress.set('')
+
+    def split_domains(self):
+        """Main task. Read input file and write contents to output file.
+        The progress is informed to the user.
+
+        """
+        self.root.config(cursor='watch')
+        fin = open(self.input)
+        fout = open(self.output, 'w')
+
+        dom = re.compile(r"""(http://)?(www\.)?
+                             ([a-z0-9\-]+\.)?([a-z0-9\-]+)
+                             \.([a-z]{2,3})(\.[a-z]{2,3)?""", re.X)
+        num = re.compile(r"\d+")
+
+        domains = dom.findall(fin.read().lower())
+        total, i = float(len(domains)), 0.0
+        begin = time.time()
+        for http, www, subdomain, domain, type1, type2 in domains:
+            i += 1.0
+            prog = 'Running ... %i%%' % int(i*100.0/total)
+            self.progress.set(prog)
+            self.prog.update()
+            if '-' in domain or num.search(domain):
+                continue
+            words, prob = viterbi_segment(domain)
+            if len(words) not in [2,3] or prob == 0:
+                continue
+            url = '.'.join(x for x in [subdomain,domain,type1,type2] if x)
+            fout.write("%s,%s\n" % (url, ' '.join(words)))
+        end = time.time()
+        self.progress.set("Complete! Elapsed time: %.2fs." % (end-begin))
+        self.prog.update()
+        self.root.config(cursor='')
+
+        
+if __name__ == '__main__':
+    curr_dir = os.getcwd()
+    dir = os.path.expanduser('~')
+    if not dir:
+        dir = curr_dir
+    os.chdir(dir)
+    root = Tk()
+    app = App(root)
+    root.mainloop()
+

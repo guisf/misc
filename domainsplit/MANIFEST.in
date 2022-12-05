@@ -1,0 +1,3 @@
+include domainsplit
+include setup.py
+include data/*
