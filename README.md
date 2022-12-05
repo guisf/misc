@@ -1,3 +1,3 @@
 # Misc
 
-These directories contain a bunch of old programs, not related to research or numerical methods.
+These directories contain a bunch of pretty old programs, some perhaps depending on non-supported libraries anymore, not related to my research or numerical methods.
